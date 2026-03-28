@@ -9,6 +9,9 @@ The repository is intentionally structured as an independent package under `thir
 - Shared-mode event-driven render streams
 - Shared-mode event-driven capture streams
 - Shared-mode event-driven loopback capture streams
+- High-level playback sessions with `load / play / pause / seek / volume`
+- Built-in 10-band playback equalizer with presets, custom band gains, and headroom compensation
+- Playback-state snapshots with negotiated format and active output-device metadata
 - Device enumeration and default-device resolution
 - Explicit error model based on `sonotide::result<T>`
 - Threaded stream lifecycle with deterministic `start / stop / reset / close`
@@ -25,13 +28,33 @@ The repository is intentionally structured as an independent package under `thir
 
 ## Build
 
+Recommended on Windows and WSL:
+
 ```bash
-cmake -S . -B build -DSONOTIDE_BUILD_EXAMPLES=ON -DSONOTIDE_BUILD_TESTS=ON
-cmake --build build
-ctest --test-dir build
+"/mnt/c/Program Files/Microsoft Visual Studio/18/Professional/Common7/IDE/CommonExtensions/Microsoft/CMake/CMake/bin/cmake.exe" --preset msvc-x64-debug
+"/mnt/c/Program Files/Microsoft Visual Studio/18/Professional/Common7/IDE/CommonExtensions/Microsoft/CMake/CMake/bin/cmake.exe" --build --preset msvc-x64-debug
+"/mnt/c/Program Files/Microsoft Visual Studio/18/Professional/Common7/IDE/CommonExtensions/Microsoft/CMake/CMake/bin/ctest.exe" --preset msvc-x64-debug
+```
+
+If `cmake` is already in `PATH`, the same workflow is:
+
+```bash
+cmake --preset msvc-x64-debug
+cmake --build --preset msvc-x64-debug
+ctest --preset msvc-x64-debug
+```
+
+If you run `ctest` manually against a Visual Studio build tree, remember that it is a multi-config generator and requires the configuration name:
+
+```bash
+ctest --test-dir build/msvc-x64-debug -C Debug
 ```
 
 `Sonotide` is Windows-only at runtime. On non-Windows platforms the package still configures, but its stub backend returns `unsupported_platform`.
+
+Playback session support uses Media Foundation for source loading and decoding on Windows.
+Playback EQ runs in the render pipeline on decoded float PCM before conversion to the negotiated device format.
+Playback sessions also expose both the preferred output device id and the currently active endpoint metadata, which is useful when the system default device changes or recovery rebinds the stream.
 
 ## Quick Example
 
@@ -76,4 +99,3 @@ int main() {
 - Direct mapping to real WASAPI constraints where it matters
 
 See [docs/foundation.md](docs/foundation.md), [docs/architecture.md](docs/architecture.md), and [docs/api.md](docs/api.md) for the full engineering package.
-
