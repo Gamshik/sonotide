@@ -1,0 +1,22 @@
+#include <cassert>
+
+#include "sonotide/equalizer.h"
+
+int main() {
+    using sonotide::equalizer_preset_id;
+
+    assert(sonotide::to_string(equalizer_preset_id::rock) == "rock");
+    assert(sonotide::to_string(sonotide::equalizer_status::ready) == "ready");
+
+    const auto parsed_rock = sonotide::equalizer_preset_id_from_string("rock");
+    assert(parsed_rock.has_value());
+    assert(parsed_rock.value() == equalizer_preset_id::rock);
+
+    const auto parsed_unknown = sonotide::equalizer_preset_id_from_string("not_a_preset");
+    assert(!parsed_unknown.has_value());
+
+    sonotide::equalizer_state state;
+    assert(state.bands.size() == sonotide::equalizer_band_count);
+    assert(state.last_nonflat_band_gains_db.size() == sonotide::equalizer_band_count);
+    return 0;
+}

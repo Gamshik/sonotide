@@ -7,3 +7,6 @@ target_link_libraries(sonotide_state_machine_tests PRIVATE Sonotide::sonotide)
 target_include_directories(sonotide_state_machine_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../src)
 add_test(NAME sonotide_state_machine_tests COMMAND sonotide_state_machine_tests)
 
+add_executable(sonotide_equalizer_tests unit/equalizer_tests.cpp)
+target_link_libraries(sonotide_equalizer_tests PRIVATE Sonotide::sonotide)
+add_test(NAME sonotide_equalizer_tests COMMAND sonotide_equalizer_tests)
