@@ -19,6 +19,7 @@
       "cacheVariables": {
         "CMAKE_INSTALL_PREFIX": "${sourceDir}/build/install/msvc-x64-debug",
         "SONOTIDE_BUILD_EXAMPLES": "ON",
+        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
         "SONOTIDE_BUILD_TESTS": "ON"
       }
     }
