@@ -4,3 +4,5 @@ target_link_libraries(sonotide_list_devices PRIVATE Sonotide::sonotide)
 add_executable(sonotide_render_silence render_silence.cpp)
 target_link_libraries(sonotide_render_silence PRIVATE Sonotide::sonotide)
 
+add_executable(sonotide_playback_session playback_session.cpp)
+target_link_libraries(sonotide_playback_session PRIVATE Sonotide::sonotide)

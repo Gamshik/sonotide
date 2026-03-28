@@ -6,6 +6,7 @@
 #include "sonotide/capture_stream.h"
 #include "sonotide/device_info.h"
 #include "sonotide/loopback_capture_stream.h"
+#include "sonotide/playback_session.h"
 #include "sonotide/render_stream.h"
 #include "sonotide/result.h"
 #include "sonotide/stream_callback.h"
@@ -50,6 +51,9 @@ public:
         const loopback_stream_config& config,
         capture_callback& callback);
 
+    result<playback_session> open_playback_session(
+        const playback_session_config& config = {});
+
 private:
     explicit runtime(std::shared_ptr<detail::runtime_backend> backend) noexcept;
 
@@ -57,4 +61,3 @@ private:
 };
 
 }  // namespace sonotide
-

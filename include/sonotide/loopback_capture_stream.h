@@ -6,8 +6,10 @@
 #include "sonotide/stream_status.h"
 
 namespace sonotide {
+class loopback_capture_stream;
 namespace detail {
 class stream_handle;
+loopback_capture_stream make_loopback_capture_stream(std::shared_ptr<stream_handle> handle);
 }
 
 class loopback_capture_stream {
@@ -34,7 +36,8 @@ private:
     std::shared_ptr<detail::stream_handle> handle_;
 
     friend class runtime;
+    friend loopback_capture_stream detail::make_loopback_capture_stream(
+        std::shared_ptr<detail::stream_handle> handle);
 };
 
 }  // namespace sonotide
-

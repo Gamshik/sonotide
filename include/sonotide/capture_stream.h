@@ -6,8 +6,10 @@
 #include "sonotide/stream_status.h"
 
 namespace sonotide {
+class capture_stream;
 namespace detail {
 class stream_handle;
+capture_stream make_capture_stream(std::shared_ptr<stream_handle> handle);
 }
 
 class capture_stream {
@@ -34,7 +36,7 @@ private:
     std::shared_ptr<detail::stream_handle> handle_;
 
     friend class runtime;
+    friend capture_stream detail::make_capture_stream(std::shared_ptr<detail::stream_handle> handle);
 };
 
 }  // namespace sonotide
-

@@ -29,6 +29,11 @@ loopback_capture_stream::loopback_capture_stream(
     std::shared_ptr<detail::stream_handle> handle) noexcept
     : handle_(std::move(handle)) {}
 
+loopback_capture_stream detail::make_loopback_capture_stream(
+    std::shared_ptr<detail::stream_handle> handle) {
+    return loopback_capture_stream(std::move(handle));
+}
+
 bool loopback_capture_stream::is_open() const noexcept {
     return static_cast<bool>(handle_);
 }
@@ -74,4 +79,3 @@ stream_status loopback_capture_stream::status() const {
 }
 
 }  // namespace sonotide
-

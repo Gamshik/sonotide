@@ -6,8 +6,10 @@
 #include "sonotide/stream_status.h"
 
 namespace sonotide {
+class render_stream;
 namespace detail {
 class stream_handle;
+render_stream make_render_stream(std::shared_ptr<stream_handle> handle);
 }
 
 class render_stream {
@@ -34,7 +36,8 @@ private:
     std::shared_ptr<detail::stream_handle> handle_;
 
     friend class runtime;
+    friend class playback_session;
+    friend render_stream detail::make_render_stream(std::shared_ptr<detail::stream_handle> handle);
 };
 
 }  // namespace sonotide
-

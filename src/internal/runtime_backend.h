@@ -4,11 +4,14 @@
 #include <vector>
 
 #include "sonotide/device_info.h"
+#include "sonotide/loopback_capture_stream.h"
+#include "sonotide/render_stream.h"
 #include "sonotide/result.h"
 #include "sonotide/runtime.h"
 #include "sonotide/stream_callback.h"
 #include "sonotide/stream_config.h"
 #include "sonotide/stream_status.h"
+#include "sonotide/capture_stream.h"
 
 namespace sonotide::detail {
 
@@ -48,6 +51,8 @@ public:
 };
 
 [[nodiscard]] result<std::shared_ptr<runtime_backend>> make_runtime_backend(runtime_options options);
+[[nodiscard]] render_stream make_render_stream(std::shared_ptr<stream_handle> handle);
+[[nodiscard]] capture_stream make_capture_stream(std::shared_ptr<stream_handle> handle);
+[[nodiscard]] loopback_capture_stream make_loopback_capture_stream(std::shared_ptr<stream_handle> handle);
 
 }  // namespace sonotide::detail
-

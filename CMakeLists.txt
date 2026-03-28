@@ -12,14 +12,20 @@ option(SONOTIDE_BUILD_TESTS "Build Sonotide unit tests" ON)
 add_library(sonotide
     src/error.cpp
     src/runtime.cpp
+    src/playback_session.cpp
     src/render_stream.cpp
     src/capture_stream.cpp
     src/loopback_capture_stream.cpp
     src/internal/state_machine.cpp
+    src/internal/dsp/parameter_smoother.cpp
+    src/internal/dsp/biquad_filter.cpp
+    src/internal/dsp/output_headroom_controller.cpp
+    src/internal/dsp/equalizer_chain.cpp
 )
 
 if(WIN32)
     target_sources(sonotide PRIVATE
+        src/internal/win/media_foundation_decoder.cpp
         src/internal/win/com_scope.cpp
         src/internal/win/device_utils.cpp
         src/internal/win/hresult_utils.cpp
@@ -46,7 +52,7 @@ target_include_directories(sonotide
 )
 
 if(MSVC)
-    target_compile_options(sonotide PRIVATE /W4 /permissive-)
+    target_compile_options(sonotide PRIVATE /W4 /permissive- /FS)
 else()
     target_compile_options(sonotide PRIVATE -Wall -Wextra -Wpedantic)
 endif()

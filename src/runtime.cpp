@@ -1,4 +1,5 @@
 #include "sonotide/runtime.h"
+#include "sonotide/playback_session.h"
 
 #include <memory>
 #include <utility>
@@ -37,7 +38,7 @@ result<render_stream> runtime::open_render_stream(
         return result<render_stream>::failure(handle_result.error());
     }
 
-    return result<render_stream>::success(render_stream(std::move(handle_result.value())));
+    return result<render_stream>::success(detail::make_render_stream(std::move(handle_result.value())));
 }
 
 result<capture_stream> runtime::open_capture_stream(
@@ -48,7 +49,7 @@ result<capture_stream> runtime::open_capture_stream(
         return result<capture_stream>::failure(handle_result.error());
     }
 
-    return result<capture_stream>::success(capture_stream(std::move(handle_result.value())));
+    return result<capture_stream>::success(detail::make_capture_stream(std::move(handle_result.value())));
 }
 
 result<loopback_capture_stream> runtime::open_loopback_stream(
@@ -60,8 +61,11 @@ result<loopback_capture_stream> runtime::open_loopback_stream(
     }
 
     return result<loopback_capture_stream>::success(
-        loopback_capture_stream(std::move(handle_result.value())));
+        detail::make_loopback_capture_stream(std::move(handle_result.value())));
+}
+
+result<playback_session> runtime::open_playback_session(const playback_session_config& config) {
+    return playback_session::create(backend_, config);
 }
 
 }  // namespace sonotide
-

@@ -28,6 +28,10 @@ stream_status closed_status() {
 render_stream::render_stream(std::shared_ptr<detail::stream_handle> handle) noexcept
     : handle_(std::move(handle)) {}
 
+render_stream detail::make_render_stream(std::shared_ptr<detail::stream_handle> handle) {
+    return render_stream(std::move(handle));
+}
+
 bool render_stream::is_open() const noexcept {
     return static_cast<bool>(handle_);
 }
@@ -73,4 +77,3 @@ stream_status render_stream::status() const {
 }
 
 }  // namespace sonotide
-
