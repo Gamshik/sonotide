@@ -61,6 +61,15 @@ ctest --preset msvc-x64-debug
 ctest --test-dir build/msvc-x64-debug -C Debug
 ```
 
+Для CI в репозитории предусмотрен отдельный preset `ci-ninja-debug`, который
+используется GitHub Actions:
+
+```bash
+cmake --preset ci-ninja-debug
+cmake --build --preset ci-ninja-debug
+ctest --preset ci-ninja-debug
+```
+
 ## Быстрый пример
 
 Ниже минимальный пример, который открывает поток вывода и пишет в него тишину.

@@ -22,6 +22,20 @@
         "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
         "SONOTIDE_BUILD_TESTS": "ON"
       }
+    },
+    {
+      "name": "ci-ninja-debug",
+      "displayName": "CI Ninja Debug",
+      "description": "Configure Sonotide for CI with Ninja and a single-config Debug build.",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/ci-ninja-debug",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "CMAKE_INSTALL_PREFIX": "${sourceDir}/build/install/ci-ninja-debug",
+        "SONOTIDE_BUILD_EXAMPLES": "ON",
+        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
+        "SONOTIDE_BUILD_TESTS": "ON"
+      }
     }
   ],
   "buildPresets": [
@@ -31,6 +45,12 @@
       "description": "Build Sonotide with the MSVC x64 Debug configure preset.",
       "configurePreset": "msvc-x64-debug",
       "configuration": "Debug"
+    },
+    {
+      "name": "ci-ninja-debug",
+      "displayName": "Build CI Ninja Debug",
+      "description": "Build Sonotide with the CI Ninja Debug configure preset.",
+      "configurePreset": "ci-ninja-debug"
     }
   ],
   "testPresets": [
@@ -40,6 +60,15 @@
       "description": "Run Sonotide tests from the MSVC x64 Debug build tree.",
       "configurePreset": "msvc-x64-debug",
       "configuration": "Debug",
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
+      "name": "ci-ninja-debug",
+      "displayName": "Test CI Ninja Debug",
+      "description": "Run Sonotide tests from the CI Ninja Debug build tree.",
+      "configurePreset": "ci-ninja-debug",
       "output": {
         "outputOnFailure": true
       }

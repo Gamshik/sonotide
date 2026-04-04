@@ -1,0 +1,29 @@
+name: Framework CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  build-and-test:
+    runs-on: windows-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up MSVC developer command prompt
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+
+      - name: Configure with CMake preset
+        run: cmake --preset ci-ninja-debug
+
+      - name: Build with CMake preset
+        run: cmake --build --preset ci-ninja-debug
+
+      - name: Run tests with CTest preset
+        run: ctest --preset ci-ninja-debug
