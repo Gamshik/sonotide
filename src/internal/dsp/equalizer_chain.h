@@ -76,6 +76,10 @@ private:
     std::array<float, equalizer_max_band_count> current_band_frequencies_hz_{};
     /// Запрошенные значения центральных частот полос.
     std::array<float, equalizer_max_band_count> target_band_frequencies_hz_{};
+    /// Последние реально применённые значения добротности полос.
+    std::array<float, equalizer_max_band_count> current_band_q_values_{};
+    /// Запрошенные значения добротности полос.
+    std::array<float, equalizer_max_band_count> target_band_q_values_{};
     /// Вспомогательный объект для оценки безопасной компенсации предусиления.
     output_headroom_controller headroom_controller_;
     /// Пользовательский gain после EQ-обработки.

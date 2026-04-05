@@ -37,6 +37,7 @@ add_library(sonotide STATIC
     src/internal/state_machine.cpp
     src/internal/dsp/parameter_smoother.cpp
     src/internal/dsp/biquad_filter.cpp
+    src/internal/dsp/equalizer_response_sampler.cpp
     src/internal/dsp/output_headroom_controller.cpp
     src/internal/dsp/equalizer_chain.cpp
 )

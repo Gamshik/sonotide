@@ -7,8 +7,6 @@
 namespace sonotide::detail::dsp {
 namespace {
 
-/// Коэффициент Q подобран так, чтобы peaking EQ-кривая была музыкально полезной.
-constexpr float kEqualizerQ = 1.414F;
 /// Короткий переход для пользовательских изменений параметров.
 constexpr std::size_t kRampMilliseconds = 24;
 /// Размер контрольного блока, который используется для обновления коэффициентов небольшими порциями.
@@ -36,6 +34,11 @@ std::array<float, equalizer_max_band_count> default_band_frequencies_hz() {
     return frequencies;
 }
 
+float clamp_q_value(const float q_value) {
+    const equalizer_q_limits q_limits = supported_equalizer_q_limits();
+    return (std::clamp)(q_value, q_limits.min_q_value, q_limits.max_q_value);
+}
+
 }  // namespace
 
 /// Конфигурирует EQ-цепочку под конкретный формат вывода.
@@ -53,6 +56,12 @@ void equalizer_chain::configure(const float sample_rate, const std::size_t chann
         if (current_band_frequencies_hz_[band_index] <= 0.0F) {
             current_band_frequencies_hz_[band_index] = target_band_frequencies_hz_[band_index];
         }
+        if (target_band_q_values_[band_index] <= 0.0F) {
+            target_band_q_values_[band_index] = default_equalizer_q_value;
+        }
+        if (current_band_q_values_[band_index] <= 0.0F) {
+            current_band_q_values_[band_index] = target_band_q_values_[band_index];
+        }
 
         /// Каждая полоса на старте конфигурируется нейтральным набором коэффициентов.
         filters_[band_index].configure(
@@ -60,7 +69,7 @@ void equalizer_chain::configure(const float sample_rate, const std::size_t chann
             make_peaking_coefficients(
                 sample_rate_,
                 target_band_frequencies_hz_[band_index],
-                kEqualizerQ,
+                current_band_q_values_[band_index],
                 current_band_gains_db_[band_index]));
         /// Сглаживатели сбрасываются к текущей цели, чтобы configure() не вносил скачок.
         band_gain_smoothers_[band_index].reset(target_band_gains_db_[band_index]);
@@ -98,6 +107,8 @@ void equalizer_chain::set_bands(const std::span<const equalizer_band> bands) {
     for (std::size_t band_index = 0; band_index < active_band_count_; ++band_index) {
         target_band_frequencies_hz_[band_index] = active_bands[band_index].center_frequency_hz;
         target_band_gains_db_[band_index] = active_bands[band_index].gain_db;
+        target_band_q_values_[band_index] = clamp_q_value(active_bands[band_index].q_value);
+        current_band_q_values_[band_index] = target_band_q_values_[band_index];
         /// Каждая полоса движется к своей цели с одинаковой длиной перехода.
         band_gain_smoothers_[band_index].set_target(target_band_gains_db_[band_index], ramp_samples);
         band_frequency_smoothers_[band_index].set_target(
@@ -108,6 +119,8 @@ void equalizer_chain::set_bands(const std::span<const equalizer_band> bands) {
         target_band_gains_db_[band_index] = 0.0F;
         band_gain_smoothers_[band_index].reset(0.0F);
         band_frequency_smoothers_[band_index].reset(target_band_frequencies_hz_[band_index]);
+        target_band_q_values_[band_index] = default_equalizer_q_value;
+        current_band_q_values_[band_index] = default_equalizer_q_value;
     }
 
     headroom_compensation_db_ =
@@ -179,6 +192,7 @@ std::vector<equalizer_band> equalizer_chain::target_bands() const {
         bands.push_back(equalizer_band{
             .center_frequency_hz = target_band_frequencies_hz_[band_index],
             .gain_db = target_band_gains_db_[band_index],
+            .q_value = target_band_q_values_[band_index],
         });
     }
 
@@ -227,7 +241,7 @@ void equalizer_chain::update_filter_coefficients(const std::size_t control_block
             make_peaking_coefficients(
                 sample_rate_,
                 current_band_frequencies_hz_[band_index],
-                kEqualizerQ,
+                current_band_q_values_[band_index],
                 current_band_gains_db_[band_index]));
     }
 }

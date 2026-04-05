@@ -7,12 +7,16 @@
 #include <string_view>
 #include <vector>
 
+#include "sonotide/result.h"
+
 namespace sonotide {
 
 /// Максимальное число полос, которое экспонирует встроенный эквалайзер Sonotide.
 inline constexpr std::size_t equalizer_max_band_count = 10;
 /// Исторический псевдоним, сохранённый для совместимости со старым 10-band API.
 inline constexpr std::size_t equalizer_band_count = equalizer_max_band_count;
+/// Историческое значение Q, на котором был построен исходный встроенный эквалайзер Sonotide.
+inline constexpr float default_equalizer_q_value = 1.414F;
 
 /// Поддерживаемые пресеты эквалайзера, которые экспонирует framework.
 enum class equalizer_preset_id {
@@ -70,6 +74,8 @@ struct equalizer_band {
     float center_frequency_hz = 0.0F;
     /// Усиление, применяемое к полосе, в dB.
     float gain_db = 0.0F;
+    /// Добротность полосы, определяющая ширину её отклика.
+    float q_value = default_equalizer_q_value;
 };
 
 /// Глобальные ограничения количества полос EQ.
@@ -98,16 +104,48 @@ struct equalizer_frequency_range {
     float max_frequency_hz = 20000.0F;
 };
 
+/// Глобальные ограничения добротности полос.
+struct equalizer_q_limits {
+    /// Минимально допустимая добротность полосы.
+    float min_q_value = 0.1F;
+    /// Максимально допустимая добротность полосы.
+    float max_q_value = 12.0F;
+};
+
 /// Возвращает поддерживаемый диапазон количества полос.
 [[nodiscard]] equalizer_band_count_limits supported_equalizer_band_count_limits() noexcept;
 /// Возвращает поддерживаемый глобальный диапазон частот и минимальный зазор полос.
 [[nodiscard]] equalizer_frequency_limits supported_equalizer_frequency_limits() noexcept;
+/// Возвращает поддерживаемый диапазон добротности полос.
+[[nodiscard]] equalizer_q_limits supported_equalizer_q_limits() noexcept;
 /// Возвращает стандартную раскладку полос Sonotide для запрошенного количества полос.
 [[nodiscard]] std::vector<equalizer_band> make_default_equalizer_bands(std::size_t band_count);
 /// Возвращает диапазон частот, доступный для перемещения конкретной полосы в текущей раскладке.
 [[nodiscard]] std::optional<equalizer_frequency_range> equalizer_band_editable_frequency_range(
     std::span<const equalizer_band> bands,
     std::size_t band_index) noexcept;
+
+/// Одна sampled-точка итоговой EQ-кривой.
+struct equalizer_response_point {
+    /// Частота точки выборки в Hz.
+    float frequency_hz = 0.0F;
+    /// Итоговый отклик на этой частоте в dB.
+    float response_db = 0.0F;
+};
+
+/// Результат выборки итоговой кривой эквалайзера.
+struct equalizer_response_curve {
+    /// Точки отклика в том же порядке, в котором были запрошены.
+    std::vector<equalizer_response_point> points;
+    /// Частота дискретизации, использованная при расчёте отклика.
+    float sample_rate_hz = 0.0F;
+    /// Автоматическая компенсация предусиления, реально включённая в sampled-кривую.
+    float applied_headroom_compensation_db = 0.0F;
+    /// Пользовательский выходной gain, реально включённый в sampled-кривую.
+    float applied_output_gain_db = 0.0F;
+    /// Истина, если sampled-кривая отражает включённый путь EQ.
+    bool enabled = false;
+};
 
 /// Определение встроенного preset с заголовком и reference gain-кривой.
 struct equalizer_preset {
@@ -141,6 +179,12 @@ struct equalizer_state {
     /// Человекочитаемое сообщение об ошибке, если EQ не готов.
     std::string error_message;
 };
+
+/// Возвращает sampled-точки итоговой кривой эквалайзера для указанного списка частот.
+[[nodiscard]] result<equalizer_response_curve> sample_equalizer_response(
+    const equalizer_state& state,
+    float sample_rate_hz,
+    std::span<const float> frequencies_hz);
 
 /// Преобразует идентификатор preset в стабильный строковый токен.
 [[nodiscard]] inline std::string_view to_string(const equalizer_preset_id preset_id) {

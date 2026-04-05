@@ -2,36 +2,11 @@
 
 #include <algorithm>
 #include <cmath>
-#include <complex>
 
-#include "internal/dsp/biquad_filter.h"
+#include "internal/dsp/equalizer_response_sampler.h"
 
 namespace sonotide::detail::dsp {
 namespace {
-
-/// Математическая константа pi, используемая при вычислении АЧХ.
-constexpr float kPi = 3.14159265358979323846F;
-/// Тот же коэффициент Q, что и в EQ chain, чтобы оценка запаса по уровню совпадала с рабочим путём.
-constexpr float kEqualizerQ = 1.414F;
-
-/// Вычисляет частотную характеристику одного biquad в децибелах.
-float evaluate_frequency_response_db(
-    const biquad_coefficients& coefficients,
-    const float normalized_frequency) {
-    /// АЧХ вычисляется на единичной окружности, потому что нас интересует только модуль.
-    const std::complex<float> z1 = std::exp(
-        std::complex<float>(0.0F, -2.0F * kPi * normalized_frequency));
-    const std::complex<float> z2 = z1 * z1;
-    const std::complex<float> numerator =
-        coefficients.b0 + coefficients.b1 * z1 + coefficients.b2 * z2;
-    const std::complex<float> denominator = 1.0F + coefficients.a1 * z1 + coefficients.a2 * z2;
-    const float magnitude = std::abs(numerator / denominator);
-    if (magnitude <= 0.0F) {
-        return -120.0F;
-    }
-
-    return 20.0F * std::log10(magnitude);
-}
 
 }  // namespace
 
@@ -54,17 +29,8 @@ float output_headroom_controller::compute_target_preamp_db(
             static_cast<float>(frequency_points - 1);
         const float frequency_hz =
             (std::min)(20.0F * std::pow(1000.0F, ratio), sample_rate * 0.45F);
-        float response_db = 0.0F;
-
-        for (const equalizer_band& band : bands) {
-            /// Каждая EQ-полоса вносит вклад в общую оценку АЧХ.
-            const biquad_coefficients coefficients = make_peaking_coefficients(
-                sample_rate,
-                band.center_frequency_hz,
-                kEqualizerQ,
-                band.gain_db);
-            response_db += evaluate_frequency_response_db(coefficients, frequency_hz / sample_rate);
-        }
+        const float response_db =
+            sample_equalizer_band_response_db(bands, sample_rate, frequency_hz);
 
         max_response_db = (std::max)(max_response_db, response_db);
     }

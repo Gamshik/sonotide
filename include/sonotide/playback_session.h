@@ -4,6 +4,7 @@
 #include <cstddef>
 #include <memory>
 #include <optional>
+#include <span>
 #include <string>
 #include <vector>
 
@@ -68,6 +69,8 @@ public:
     result<void> select_equalizer_preset(equalizer_preset_id preset_id);
     /// Устанавливает gain для одной полосы EQ.
     result<void> set_equalizer_band_gain(std::size_t band_index, float gain_db);
+    /// Устанавливает добротность для одной полосы EQ.
+    result<void> set_equalizer_band_q(std::size_t band_index, float q_value);
     /// Добавляет новую полосу EQ в допустимую частотную позицию.
     result<void> add_equalizer_band(float center_frequency_hz, float gain_db = 0.0F);
     /// Удаляет существующую полосу EQ по индексу.
@@ -88,6 +91,8 @@ public:
     [[nodiscard]] playback_state state() const;
     /// Возвращает текущий снимок эквалайзера.
     [[nodiscard]] equalizer_state equalizer_state() const;
+    /// Возвращает sampled-точки итоговой EQ-кривой для текущего live-состояния сессии.
+    result<equalizer_response_curve> sample_equalizer_response(std::span<const float> frequencies_hz) const;
     /// Возвращает допустимый диапазон частот для конкретной полосы текущего EQ-layout.
     [[nodiscard]] std::optional<equalizer_frequency_range> equalizer_band_frequency_range(
         std::size_t band_index) const;
