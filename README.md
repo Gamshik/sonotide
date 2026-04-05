@@ -18,7 +18,8 @@ without copying the same Windows-specific audio layer around.
 - open shared-mode loopback capture streams;
 - build playback sessions on top of `runtime` and the decoder pipeline;
 - load and decode media sources through Media Foundation on Windows;
-- apply the built-in equalizer with a dynamic band count up to 10, presets, and output headroom compensation;
+- apply the built-in equalizer with a dynamic band count up to 10, per-band `Q`, presets, and output headroom compensation;
+- sample the exact steady-state EQ response curve for UI rendering or diagnostics instead of approximating it on the frontend;
 - expose playback-state snapshots, including the negotiated format and active device;
 - use an explicit error model through `sonotide::result<T>`.
 
