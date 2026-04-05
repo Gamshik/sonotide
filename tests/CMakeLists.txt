@@ -20,3 +20,8 @@ add_executable(sonotide_stream_wrapper_tests unit/stream_wrapper_tests.cpp)
 target_link_libraries(sonotide_stream_wrapper_tests PRIVATE Sonotide::sonotide)
 target_include_directories(sonotide_stream_wrapper_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../src)
 add_test(NAME sonotide_stream_wrapper_tests COMMAND sonotide_stream_wrapper_tests)
+
+add_executable(sonotide_playback_session_tests unit/playback_session_tests.cpp)
+target_link_libraries(sonotide_playback_session_tests PRIVATE Sonotide::sonotide)
+target_include_directories(sonotide_playback_session_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../src)
+add_test(NAME sonotide_playback_session_tests COMMAND sonotide_playback_session_tests)

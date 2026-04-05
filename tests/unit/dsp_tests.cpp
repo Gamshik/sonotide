@@ -7,6 +7,7 @@
 
 #include "internal/dsp/biquad_filter.h"
 #include "internal/dsp/equalizer_chain.h"
+#include "internal/dsp/equalizer_response_sampler.h"
 #include "internal/dsp/output_headroom_controller.h"
 #include "internal/dsp/parameter_smoother.h"
 
@@ -24,9 +25,11 @@ int main() {
     using sonotide::equalizer_band;
     using sonotide::detail::dsp::biquad_filter;
     using sonotide::detail::dsp::equalizer_chain;
+    using sonotide::detail::dsp::evaluate_frequency_response_db;
     using sonotide::detail::dsp::make_peaking_coefficients;
     using sonotide::detail::dsp::output_headroom_controller;
     using sonotide::detail::dsp::parameter_smoother;
+    using sonotide::detail::dsp::sample_equalizer_band_response_db;
 
     // parameter_smoother: reset и мгновенный переход должны немедленно фиксировать значение.
     parameter_smoother smoother;
@@ -59,6 +62,37 @@ int main() {
     assert(approximately_equal(flat_coefficients.b1, flat_coefficients.a1, 0.001F));
     assert(approximately_equal(flat_coefficients.b2, flat_coefficients.a2, 0.001F));
 
+    // Частотный sampler должен отражать gain вблизи центра и давать плоскую линию для flat-band.
+    const std::array<equalizer_band, 1> flat_band{{
+        {.center_frequency_hz = 1000.0F, .gain_db = 0.0F, .q_value = 1.414F},
+    }};
+    assert(approximately_equal(
+        sample_equalizer_band_response_db(flat_band, 48000.0F, 1000.0F),
+        0.0F,
+        0.05F));
+
+    const std::array<equalizer_band, 1> boosted_band{{
+        {.center_frequency_hz = 1000.0F, .gain_db = 6.0F, .q_value = 1.414F},
+    }};
+    assert(sample_equalizer_band_response_db(boosted_band, 48000.0F, 1000.0F) > 5.0F);
+
+    // При одинаковом gain высокий Q должен быть уже: ближе к центру сильнее, вдали слабее.
+    const std::array<equalizer_band, 1> low_q_band{{
+        {.center_frequency_hz = 1000.0F, .gain_db = 6.0F, .q_value = 0.5F},
+    }};
+    const std::array<equalizer_band, 1> high_q_band{{
+        {.center_frequency_hz = 1000.0F, .gain_db = 6.0F, .q_value = 8.0F},
+    }};
+    const float low_q_near_center = sample_equalizer_band_response_db(low_q_band, 48000.0F, 1000.0F);
+    const float high_q_near_center = sample_equalizer_band_response_db(high_q_band, 48000.0F, 1000.0F);
+    const float low_q_far = sample_equalizer_band_response_db(low_q_band, 48000.0F, 4000.0F);
+    const float high_q_far = sample_equalizer_band_response_db(high_q_band, 48000.0F, 4000.0F);
+    assert(approximately_equal(high_q_near_center, low_q_near_center, 0.1F));
+    assert(high_q_far < low_q_far);
+
+    // Низкоуровневая оценка отклика коэффициентов тоже должна быть нейтральной для identity-section.
+    assert(approximately_equal(evaluate_frequency_response_db({}, 0.1F), 0.0F, 0.001F));
+
     // biquad_filter: без configure или с неправильным channel_count буфер не должен меняться.
     biquad_filter filter;
     std::array<float, 4> untouched_samples{0.25F, -0.25F, 0.5F, -0.5F};
@@ -79,10 +113,10 @@ int main() {
     output_headroom_controller headroom;
     const std::vector<equalizer_band> no_bands;
     const std::array<equalizer_band, 1> flat_single_band{{
-        {.center_frequency_hz = 1000.0F, .gain_db = 0.0F},
+        {.center_frequency_hz = 1000.0F, .gain_db = 0.0F, .q_value = 1.414F},
     }};
     const std::array<equalizer_band, 1> boosted_single_band{{
-        {.center_frequency_hz = 1000.0F, .gain_db = 6.0F},
+        {.center_frequency_hz = 1000.0F, .gain_db = 6.0F, .q_value = 1.414F},
     }};
     assert(approximately_equal(headroom.compute_target_preamp_db(no_bands, 48000.0F), 0.0F));
     assert(approximately_equal(
@@ -94,19 +128,21 @@ int main() {
 
     // Положительные boost-ы должны просить отрицательную preamp-компенсацию.
     const std::array<equalizer_band, 3> boosted_bands{{
-        {.center_frequency_hz = 120.0F, .gain_db = 6.0F},
-        {.center_frequency_hz = 1000.0F, .gain_db = 4.0F},
-        {.center_frequency_hz = 8000.0F, .gain_db = 3.0F},
+        {.center_frequency_hz = 120.0F, .gain_db = 6.0F, .q_value = 1.0F},
+        {.center_frequency_hz = 1000.0F, .gain_db = 4.0F, .q_value = 1.414F},
+        {.center_frequency_hz = 8000.0F, .gain_db = 3.0F, .q_value = 2.0F},
     }};
     const float boosted_headroom = headroom.compute_target_preamp_db(boosted_bands, 48000.0F);
     assert(boosted_headroom < 0.0F);
+    const float boosted_curve_peak = sample_equalizer_band_response_db(boosted_bands, 48000.0F, 120.0F);
+    assert(boosted_curve_peak > 0.0F);
 
     // equalizer_chain: disabled flat path должен сохранять исходный сигнал.
     equalizer_chain chain;
     chain.configure(48000.0F, 2U);
     const std::array<equalizer_band, 2> flat_chain_bands{{
-        {.center_frequency_hz = 120.0F, .gain_db = 0.0F},
-        {.center_frequency_hz = 1000.0F, .gain_db = 0.0F},
+        {.center_frequency_hz = 120.0F, .gain_db = 0.0F, .q_value = 1.414F},
+        {.center_frequency_hz = 1000.0F, .gain_db = 0.0F, .q_value = 1.414F},
     }};
     chain.set_bands(flat_chain_bands);
     chain.set_enabled(false);
@@ -132,6 +168,7 @@ int main() {
         too_many_bands.push_back(equalizer_band{
             .center_frequency_hz = 100.0F + static_cast<float>(index) * 100.0F,
             .gain_db = 1.0F,
+            .q_value = 1.414F,
         });
     }
     chain.set_bands(too_many_bands);
@@ -143,7 +180,7 @@ int main() {
     equalizer_chain active_chain;
     active_chain.configure(48000.0F, 1U);
     const std::array<equalizer_band, 1> active_chain_bands{{
-        {.center_frequency_hz = 1000.0F, .gain_db = 9.0F},
+        {.center_frequency_hz = 1000.0F, .gain_db = 9.0F, .q_value = 6.0F},
     }};
     active_chain.set_bands(active_chain_bands);
     active_chain.set_enabled(true);

@@ -1,3 +1,4 @@
+#include <array>
 #include <cassert>
 #include <cmath>
 #include <string_view>
@@ -8,6 +9,7 @@
 int main() {
     // Чтобы тест был компактным, используем локальный псевдоним для перечисления пресетов.
     using sonotide::equalizer_preset_id;
+    constexpr float kEpsilon = 0.01F;
 
     // Строковые представления должны быть стабильными, потому что их используют документация и сохранение состояния.
     assert(sonotide::to_string(equalizer_preset_id::rock) == "rock");
@@ -32,12 +34,19 @@ int main() {
     assert(frequency_limits.max_frequency_hz == 20000.0F);
     assert(frequency_limits.min_band_spacing_hz == 10.0F);
 
+    const auto q_limits = sonotide::supported_equalizer_q_limits();
+    assert(q_limits.min_q_value == 0.1F);
+    assert(q_limits.max_q_value == 12.0F);
+    assert(sonotide::default_equalizer_q_value >= q_limits.min_q_value);
+    assert(sonotide::default_equalizer_q_value <= q_limits.max_q_value);
+
     // Дефолтные раскладки должны быть доступны для любого количества полос от 0 до 10.
     for (std::size_t band_count = 0; band_count <= sonotide::equalizer_max_band_count; ++band_count) {
         const auto bands = sonotide::make_default_equalizer_bands(band_count);
         assert(bands.size() == band_count);
         for (std::size_t index = 0; index < bands.size(); ++index) {
             assert(bands[index].gain_db == 0.0F);
+            assert(std::fabs(bands[index].q_value - sonotide::default_equalizer_q_value) < kEpsilon);
             assert(bands[index].center_frequency_hz >= frequency_limits.min_frequency_hz);
             assert(bands[index].center_frequency_hz <= frequency_limits.max_frequency_hz);
             if (index > 0U) {
@@ -103,8 +112,61 @@ int main() {
     assert(state.last_nonflat_band_gains_db.size() == sonotide::equalizer_max_band_count);
     for (std::size_t index = 0; index < state.bands.size(); ++index) {
         assert(std::fabs(state.bands[index].gain_db) < 0.0001F);
+        assert(std::fabs(state.bands[index].q_value - sonotide::default_equalizer_q_value) < 0.0001F);
         assert(std::fabs(state.last_nonflat_band_gains_db[index]) < 0.0001F);
     }
+
+    // Public response sampling: disabled EQ должен возвращать плоскую линию 0 dB.
+    const std::array<float, 3> frequencies_hz{{100.0F, 1000.0F, 8000.0F}};
+    auto disabled_curve_result = sonotide::sample_equalizer_response(state, 48000.0F, frequencies_hz);
+    assert(disabled_curve_result);
+    assert(disabled_curve_result.value().enabled == false);
+    assert(std::fabs(disabled_curve_result.value().applied_headroom_compensation_db) < kEpsilon);
+    assert(std::fabs(disabled_curve_result.value().applied_output_gain_db) < kEpsilon);
+    assert(disabled_curve_result.value().points.size() == frequencies_hz.size());
+    for (std::size_t index = 0; index < frequencies_hz.size(); ++index) {
+        assert(std::fabs(disabled_curve_result.value().points[index].frequency_hz - frequencies_hz[index]) < kEpsilon);
+        assert(std::fabs(disabled_curve_result.value().points[index].response_db) < kEpsilon);
+    }
+
+    // Invalid sampling inputs must be rejected explicitly.
+    auto empty_curve_result =
+        sonotide::sample_equalizer_response(state, 48000.0F, std::span<const float>{});
+    assert(!empty_curve_result);
+    assert(empty_curve_result.error().code == sonotide::error_code::invalid_argument);
+
+    auto invalid_rate_result = sonotide::sample_equalizer_response(state, 0.0F, frequencies_hz);
+    assert(!invalid_rate_result);
+    assert(invalid_rate_result.error().code == sonotide::error_code::invalid_argument);
+
+    const std::array<float, 1> invalid_frequency_hz{{48000.0F}};
+    auto invalid_frequency_result =
+        sonotide::sample_equalizer_response(state, 48000.0F, invalid_frequency_hz);
+    assert(!invalid_frequency_result);
+    assert(invalid_frequency_result.error().code == sonotide::error_code::invalid_argument);
+
+    // Enabled EQ should apply a real curve, auto headroom compensation, output gain, and q clamping.
+    sonotide::equalizer_state active_state;
+    active_state.enabled = true;
+    active_state.output_gain_db = 2.0F;
+    active_state.bands = {{
+        {.center_frequency_hz = 1000.0F, .gain_db = 6.0F, .q_value = 2.0F},
+        {.center_frequency_hz = 6000.0F, .gain_db = -3.0F, .q_value = 100.0F},
+    }};
+    const std::array<float, 4> active_frequencies_hz{{200.0F, 1000.0F, 6000.0F, 12000.0F}};
+    auto active_curve_result =
+        sonotide::sample_equalizer_response(active_state, 48000.0F, active_frequencies_hz);
+    assert(active_curve_result);
+    assert(active_curve_result.value().enabled == true);
+    assert(active_curve_result.value().applied_headroom_compensation_db < 0.0F);
+    assert(std::fabs(active_curve_result.value().applied_output_gain_db - 2.0F) < kEpsilon);
+    assert(active_curve_result.value().points.size() == active_frequencies_hz.size());
+    assert(active_curve_result.value().points[1].response_db >
+        active_curve_result.value().points[0].response_db);
+    assert(active_curve_result.value().points[1].response_db >
+        active_curve_result.value().points[3].response_db);
+    assert(active_curve_result.value().points[2].response_db <
+        active_curve_result.value().points[1].response_db);
 
     // Текстовые токены должны оставаться стабильными для UI и сериализации.
     assert(
