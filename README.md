@@ -96,6 +96,20 @@ cmake --build --preset ci-ninja-debug
 ctest --preset ci-ninja-debug
 ```
 
+## Releases
+
+Публикация версии идёт через git tag вида `v*`, например `v0.1.0`.
+Отдельный workflow собирает `Release`, прогоняет тесты, выполняет
+`cmake --install`, проверяет install tree через минимальный consumer-проект и
+автоматически создаёт GitHub Release с SDK-архивом вида:
+
+```text
+sonotide-0.1.0-windows-msvc-x64-release.zip
+```
+
+В архив попадает install tree, который пользователь может распаковать и
+подключить через `find_package(Sonotide CONFIG REQUIRED)`.
+
 ## Быстрый пример
 
 Ниже минимальный пример, который открывает поток вывода и пишет в него тишину.
