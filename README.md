@@ -1,67 +1,51 @@
 # Sonotide
 
-Sonotide - это независимый C++20-фреймворк для работы со звуком на Windows.
-Он закрывает низкоуровневую часть вокруг WASAPI, а сверху даёт понятный API
-для перечисления устройств, открытия потоков вывода, захвата и loopback, а
-также для сборки сессий воспроизведения с Media Foundation и встроенным
-эквалайзером.
+Sonotide is an independent C++20 audio framework for Windows. It wraps the
+low-level WASAPI layer and exposes a compact public API for device
+enumeration, render/capture/loopback streams, and higher-level playback
+sessions built on Media Foundation and the built-in equalizer.
 
-Фреймворк задуман как отдельный пакет, а не как кусок приложения. У него свой
-CMake-проект, свои примеры, свои тесты и своя документация. Это удобно, когда
-нужно переиспользовать аудиошину в нескольких проектах и не тащить туда
-компактный, но всё же сложный Windows-специфичный слой.
+The repository is intentionally framework-focused rather than app-specific. It
+contains the library itself, runnable examples, unit tests, and framework
+documentation. That makes Sonotide easy to reuse across multiple projects
+without copying the same Windows-specific audio layer around.
 
-## Что умеет
+## Features
 
-- перечислять аудиоустройства и получать устройство по умолчанию;
-- открывать потоки вывода в shared-режиме с событийной моделью WASAPI;
-- открывать потоки захвата в shared-режиме с событийной моделью WASAPI;
-- открывать loopback-потоки в shared-режиме;
-- собирать сессию воспроизведения поверх `runtime` и декодера;
-- загружать и декодировать источники через Media Foundation на Windows;
-- применять встроенный эквалайзер с динамическим числом полос до 10, пресетами и компенсацией запаса по уровню;
-- хранить снимок состояния воспроизведения, включая согласованный формат и активное устройство;
-- использовать явную модель ошибок через `sonotide::result<T>`.
+- enumerate audio devices and query the system default device;
+- open shared-mode WASAPI render streams with an event-driven callback model;
+- open shared-mode WASAPI capture streams;
+- open shared-mode loopback capture streams;
+- build playback sessions on top of `runtime` and the decoder pipeline;
+- load and decode media sources through Media Foundation on Windows;
+- apply the built-in equalizer with a dynamic band count up to 10, presets, and output headroom compensation;
+- expose playback-state snapshots, including the negotiated format and active device;
+- use an explicit error model through `sonotide::result<T>`.
 
-На платформах вне Windows проект тоже конфигурируется, но `runtime` там
-работает в режиме заглушки и возвращает `unsupported_platform`.
+On non-Windows hosts the project still configures and builds, but `runtime`
+uses the stub backend and returns `unsupported_platform`.
 
-## Структура репозитория
+## Repository layout
 
-- `include/sonotide/` - публичный API фреймворка;
-- `src/` - реализация `runtime`, воспроизведения и внутренних backend-слоёв;
-- `examples/` - небольшие программы, показывающие типовые сценарии использования;
-- `tests/` - unit-тесты для платформенно-независимых частей;
-- `docs/` - архитектура, API, заметки по миграции и архитектурные решения;
-- `cmake/` - шаблоны и вспомогательные файлы для сборки и упаковки.
+- `include/sonotide/` - public framework API;
+- `src/` - runtime, playback, and internal backend implementation;
+- `examples/` - small programs that demonstrate common usage patterns;
+- `tests/` - unit tests for platform-neutral logic;
+- `docs/` - architecture notes, API docs, migration notes, and design rationale;
+- `cmake/` - packaging helpers and CMake support files.
 
-## Сборка
+## Build
 
-Рекомендуемый путь для Windows и WSL во время разработки - через preset
-`msvc-x64-debug`. Для прогонов, близких к релизной сборке, есть симметричный
-`msvc-x64-release`.
+The recommended development preset for Windows and WSL is
+`msvc-x64-debug`. For a build that is closer to production output, use the
+matching `msvc-x64-release` preset.
 
-На текущем этапе `sonotide` собирается только как статическая библиотека.
-Переменная `BUILD_SHARED_LIBS` намеренно не используется, чтобы библиотеку
-нельзя было случайно собрать как DLL без отдельной export/import-подготовки
-публичного API.
+At the moment Sonotide is intentionally built only as a static library.
+`BUILD_SHARED_LIBS` is not used on purpose so the project cannot be
+accidentally switched to a DLL build before the public API has proper
+export/import support.
 
-```bash
-"/mnt/c/Program Files/Microsoft Visual Studio/18/Professional/Common7/IDE/CommonExtensions/Microsoft/CMake/CMake/bin/cmake.exe" --preset msvc-x64-debug
-"/mnt/c/Program Files/Microsoft Visual Studio/18/Professional/Common7/IDE/CommonExtensions/Microsoft/CMake/CMake/bin/cmake.exe" --build --preset msvc-x64-debug
-"/mnt/c/Program Files/Microsoft Visual Studio/18/Professional/Common7/IDE/CommonExtensions/Microsoft/CMake/CMake/bin/ctest.exe" --preset msvc-x64-debug
-```
-
-Для `Release` используются те же команды с соответствующим именем preset:
-
-```bash
-"/mnt/c/Program Files/Microsoft Visual Studio/18/Professional/Common7/IDE/CommonExtensions/Microsoft/CMake/CMake/bin/cmake.exe" --preset msvc-x64-release
-"/mnt/c/Program Files/Microsoft Visual Studio/18/Professional/Common7/IDE/CommonExtensions/Microsoft/CMake/CMake/bin/cmake.exe" --build --preset msvc-x64-release
-"/mnt/c/Program Files/Microsoft Visual Studio/18/Professional/Common7/IDE/CommonExtensions/Microsoft/CMake/CMake/bin/ctest.exe" --preset msvc-x64-release
-```
-
-Если `cmake` уже доступен в `PATH`, команды те же самые, только без полного
-пути к бинарю:
+If `cmake` and `ctest` are already available in `PATH`, use:
 
 ```bash
 cmake --preset msvc-x64-debug
@@ -70,7 +54,7 @@ cmake --install build/msvc-x64-debug --config Debug
 ctest --preset msvc-x64-debug
 ```
 
-И симметричный вариант для `Release`:
+For `Release`, use the same flow with the release preset:
 
 ```bash
 cmake --preset msvc-x64-release
@@ -79,16 +63,16 @@ cmake --install build/msvc-x64-release --config Release
 ctest --preset msvc-x64-release
 ```
 
-Если запускаешь `ctest` вручную против каталога сборки Visual Studio, не забудь
-указать конфигурацию:
+If you launch `ctest` directly against a Visual Studio build directory, pass
+the configuration explicitly:
 
 ```bash
 ctest --test-dir build/msvc-x64-debug -C Debug
 ```
 
-Для single-config сценариев и CI в репозитории есть preset-ы
-`ci-ninja-debug` и `ci-ninja-release`. GitHub Actions прогоняет оба варианта,
-запускает тесты и дополнительно проверяет `cmake --install` для install tree:
+For single-config and CI scenarios the repository also provides
+`ci-ninja-debug` and `ci-ninja-release`. GitHub Actions runs both variants,
+executes the tests, and verifies `cmake --install` for the install tree:
 
 ```bash
 cmake --preset ci-ninja-debug
@@ -96,27 +80,32 @@ cmake --build --preset ci-ninja-debug
 ctest --preset ci-ninja-debug
 ```
 
+If `cmake` is not available in `PATH`, invoke the CMake binary provided by
+your Visual Studio or local toolchain installation instead of hardcoding a
+workspace-specific path in scripts or documentation.
+
 ## Releases
 
-Публикация версии идёт через git tag вида `v*`, например `v0.1.0`.
-Отдельный workflow собирает `Release`, прогоняет тесты, выполняет
-`cmake --install`, проверяет install tree через минимальный consumer-проект и
-автоматически создаёт GitHub Release с SDK-архивом вида:
+Releases are published from git tags that match `v*`, for example `v0.1.0`.
+A dedicated workflow builds the `Release` configuration, runs the tests,
+executes `cmake --install`, validates the installed package through a minimal
+consumer project, and automatically creates a GitHub Release with SDK assets
+like:
 
 ```text
 sonotide-0.1.0-windows-msvc-x64-release.zip
 sonotide-0.1.0-windows-msvc-x64-release.zip.sha256
 ```
 
-В архив попадает install tree, который пользователь может распаковать и
-подключить через `find_package(Sonotide CONFIG REQUIRED)`. Рядом публикуется
-`sha256`-файл для проверки целостности скачанного архива.
+The archive contains the install tree. Users can unpack it and consume the SDK
+through `find_package(Sonotide CONFIG REQUIRED)`. The adjacent `sha256` file is
+published as an integrity check for the downloaded archive.
 
-## Быстрый пример
+## Quick example
 
-Ниже минимальный пример, который открывает поток вывода и пишет в него тишину.
-Это не полноценный плеер, а проверка того, что `runtime` и ветка вывода
-поднимаются корректно.
+The snippet below opens a render stream and fills it with silence. It is not a
+complete player; it is just the smallest useful smoke test for `runtime` and
+the render path.
 
 ```cpp
 #include <algorithm>
@@ -152,17 +141,17 @@ int main() {
 }
 ```
 
-Для сценария воспроизведения есть отдельный пример в `examples/playback_session.cpp`.
-Он показывает, как фреймворк открывает файл, строит сессию воспроизведения и ведёт
-состояние воспроизведения без привязки к конкретному приложению.
+For a playback-oriented scenario, see `examples/playback_session.cpp`. It
+shows how the framework opens a file, builds a playback session, and manages
+transport state without tying that logic to any specific application.
 
-## Принципы
+## Design principles
 
-- публичный API не выставляет сырой COM наружу;
-- жизненный цикл объекта должен читаться без сюрпризов;
-- ошибки возвращаются явно, без исключений в горячем пути;
-- backend должен оставаться близким к реальному WASAPI-миру, а не прятать его;
-- верхний слой воспроизведения не обязан тащить в себя доменную логику приложения.
+- the public API should not expose raw COM types;
+- object lifetimes should remain predictable and explicit;
+- errors should be returned explicitly, without exceptions in the hot path;
+- the backend should stay close to the real WASAPI model instead of hiding it completely;
+- the playback layer should not absorb application-specific domain logic.
 
-Подробности по устройству фреймворка лежат в [docs/foundation.md](docs/foundation.md),
-[docs/architecture.md](docs/architecture.md) и [docs/api.md](docs/api.md).
+More detail is available in [docs/foundation.md](docs/foundation.md),
+[docs/architecture.md](docs/architecture.md), and [docs/api.md](docs/api.md).
