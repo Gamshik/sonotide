@@ -180,6 +180,16 @@ struct equalizer_state {
     std::string error_message;
 };
 
+/// Временное EQ-состояние для preview без применения в live playback session.
+struct equalizer_preview_state {
+    /// `true`, если preview должен моделировать включённый путь EQ.
+    bool enabled = false;
+    /// Временная раскладка полос, которую нужно оценить.
+    std::vector<equalizer_band> bands;
+    /// Временный output gain после EQ processing.
+    float output_gain_db = 0.0F;
+};
+
 /// Возвращает sampled-точки итоговой кривой эквалайзера для указанного списка частот.
 [[nodiscard]] result<equalizer_response_curve> sample_equalizer_response(
     const equalizer_state& state,

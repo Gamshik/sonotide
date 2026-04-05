@@ -17,6 +17,7 @@
 #include <vector>
 
 #include "internal/dsp/equalizer_chain.h"
+#include "internal/equalizer_layout_utils.h"
 #include "internal/runtime_backend.h"
 
 #if defined(_WIN32)
@@ -130,51 +131,6 @@ std::vector<float> project_preset_gains_to_bands(
     }
 
     return projected_gains_db;
-}
-
-// Нормализует пользовательскую раскладку полос: сортирует, ограничивает диапазон и выдерживает минимальный зазор.
-std::vector<equalizer_band> normalize_equalizer_bands(std::span<const equalizer_band> bands) {
-    std::vector<equalizer_band> normalized_bands(bands.begin(), bands.end());
-    const equalizer_frequency_limits frequency_limits = supported_equalizer_frequency_limits();
-
-    std::sort(
-        normalized_bands.begin(),
-        normalized_bands.end(),
-        [](const equalizer_band& left, const equalizer_band& right) {
-            return left.center_frequency_hz < right.center_frequency_hz;
-        });
-
-    for (equalizer_band& band : normalized_bands) {
-        band.center_frequency_hz = (std::clamp)(
-            band.center_frequency_hz,
-            frequency_limits.min_frequency_hz,
-            frequency_limits.max_frequency_hz);
-        band.gain_db = clamp_equalizer_gain_db(band.gain_db);
-        band.q_value = clamp_equalizer_q_value(band.q_value);
-    }
-
-    for (std::size_t index = 1; index < normalized_bands.size(); ++index) {
-        normalized_bands[index].center_frequency_hz = (std::max)(
-            normalized_bands[index].center_frequency_hz,
-            normalized_bands[index - 1U].center_frequency_hz + frequency_limits.min_band_spacing_hz);
-    }
-
-    if (!normalized_bands.empty()) {
-        normalized_bands.back().center_frequency_hz = (std::min)(
-            normalized_bands.back().center_frequency_hz,
-            frequency_limits.max_frequency_hz);
-    }
-
-    for (std::size_t index = normalized_bands.size(); index > 1U; --index) {
-        normalized_bands[index - 2U].center_frequency_hz = (std::min)(
-            normalized_bands[index - 2U].center_frequency_hz,
-            normalized_bands[index - 1U].center_frequency_hz - frequency_limits.min_band_spacing_hz);
-        normalized_bands[index - 2U].center_frequency_hz = (std::max)(
-            normalized_bands[index - 2U].center_frequency_hz,
-            frequency_limits.min_frequency_hz);
-    }
-
-    return normalized_bands;
 }
 
 // Заполняет весь render buffer нулями, когда данных источника ещё нет.
@@ -610,7 +566,7 @@ public:
         }
 
         equalizer_state_.enabled = state.enabled;
-        equalizer_state_.bands = normalize_equalizer_bands(state.bands);
+        equalizer_state_.bands = detail::normalize_equalizer_bands(state.bands);
         equalizer_state_.last_nonflat_band_gains_db.assign(equalizer_state_.bands.size(), 0.0F);
         for (std::size_t index = 0; index < equalizer_state_.bands.size(); ++index) {
             if (index < state.last_nonflat_band_gains_db.size()) {
@@ -666,18 +622,32 @@ public:
         return equalizer_state_;
     }
 
-    result<sonotide::equalizer_response_curve> sample_equalizer_response(
+    result<sonotide::equalizer_response_curve> preview_equalizer_response(
+        const sonotide::equalizer_preview_state& preview_state,
         const std::span<const float> frequencies_hz) const {
-        std::scoped_lock lock(mutex_);
-
-        float sample_rate_hz = 0.0F;
-        if (state_.negotiated_format.has_value() && state_.negotiated_format->sample_rate > 0U) {
-            sample_rate_hz = static_cast<float>(state_.negotiated_format->sample_rate);
-        } else if (last_known_sample_rate_ > 0.0F) {
-            sample_rate_hz = last_known_sample_rate_;
+        const std::optional<float> sample_rate_hz = resolve_equalizer_sample_rate_locked();
+        if (!sample_rate_hz.has_value()) {
+            return result<sonotide::equalizer_response_curve>::failure(make_error(
+                error_category::stream,
+                error_code::invalid_state,
+                "playback_session::preview_equalizer_response",
+                "Equalizer preview requires a known render sample rate. Start playback or wait for a negotiated format before requesting a session-level preview."));
         }
 
-        if (sample_rate_hz <= 0.0F) {
+        sonotide::equalizer_state preview_state_snapshot;
+        preview_state_snapshot.enabled = preview_state.enabled;
+        preview_state_snapshot.bands = detail::normalize_equalizer_bands(preview_state.bands);
+        preview_state_snapshot.output_gain_db = clamp_equalizer_gain_db(preview_state.output_gain_db);
+        return sonotide::sample_equalizer_response(
+            preview_state_snapshot,
+            *sample_rate_hz,
+            frequencies_hz);
+    }
+
+    result<sonotide::equalizer_response_curve> sample_equalizer_response(
+        const std::span<const float> frequencies_hz) const {
+        const std::optional<float> sample_rate_hz = resolve_equalizer_sample_rate_locked();
+        if (!sample_rate_hz.has_value()) {
             return result<sonotide::equalizer_response_curve>::failure(make_error(
                 error_category::stream,
                 error_code::invalid_state,
@@ -685,7 +655,12 @@ public:
                 "Equalizer response sampling requires a known render sample rate. Use the helper that accepts an explicit sample rate before playback is configured."));
         }
 
-        return sonotide::sample_equalizer_response(equalizer_state_, sample_rate_hz, frequencies_hz);
+        sonotide::equalizer_state equalizer_state_snapshot;
+        {
+            std::scoped_lock lock(mutex_);
+            equalizer_state_snapshot = equalizer_state_;
+        }
+        return sonotide::sample_equalizer_response(equalizer_state_snapshot, *sample_rate_hz, frequencies_hz);
     }
 
     std::optional<sonotide::equalizer_frequency_range> equalizer_band_frequency_range(
@@ -1032,6 +1007,18 @@ private:
 
     [[nodiscard]] float current_sample_rate_or_default_locked() const {
         return last_known_sample_rate_ > 0.0F ? last_known_sample_rate_ : 48000.0F;
+    }
+
+    [[nodiscard]] std::optional<float> resolve_equalizer_sample_rate_locked() const {
+        std::scoped_lock lock(mutex_);
+        if (state_.negotiated_format.has_value() && state_.negotiated_format->sample_rate > 0U) {
+            return static_cast<float>(state_.negotiated_format->sample_rate);
+        }
+        if (last_known_sample_rate_ > 0.0F) {
+            return last_known_sample_rate_;
+        }
+
+        return std::nullopt;
     }
 
     void configure_equalizer_for_format(const audio_format& format) {
@@ -1412,6 +1399,19 @@ result<sonotide::equalizer_response_curve> playback_session::sample_equalizer_re
             "Playback session is not open."));
     }
     return implementation_->sample_equalizer_response(frequencies_hz);
+}
+
+result<sonotide::equalizer_response_curve> playback_session::preview_equalizer_response(
+    const equalizer_preview_state& preview_state,
+    const std::span<const float> frequencies_hz) const {
+    if (!implementation_) {
+        return result<sonotide::equalizer_response_curve>::failure(make_error(
+            error_category::stream,
+            error_code::invalid_state,
+            "playback_session::preview_equalizer_response",
+            "Playback session is not open."));
+    }
+    return implementation_->preview_equalizer_response(preview_state, frequencies_hz);
 }
 
 std::optional<sonotide::equalizer_frequency_range> playback_session::equalizer_band_frequency_range(

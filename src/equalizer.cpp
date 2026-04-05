@@ -4,6 +4,7 @@
 #include <array>
 #include <cmath>
 
+#include "internal/equalizer_layout_utils.h"
 #include "internal/dsp/equalizer_response_sampler.h"
 #include "internal/dsp/output_headroom_controller.h"
 
@@ -55,35 +56,6 @@ float interpolate_default_band_frequency(
 
 float clamp_equalizer_gain_db(const float gain_db) {
     return (std::clamp)(gain_db, -12.0F, 12.0F);
-}
-
-float clamp_equalizer_q_value(const float q_value) {
-    const equalizer_q_limits q_limits = supported_equalizer_q_limits();
-    return (std::clamp)(q_value, q_limits.min_q_value, q_limits.max_q_value);
-}
-
-std::vector<equalizer_band> sanitize_equalizer_bands(std::span<const equalizer_band> bands) {
-    const equalizer_frequency_limits frequency_limits = supported_equalizer_frequency_limits();
-
-    std::vector<equalizer_band> sanitized_bands;
-    sanitized_bands.reserve((std::min)(bands.size(), static_cast<std::size_t>(equalizer_max_band_count)));
-
-    for (const equalizer_band& band : bands) {
-        if (sanitized_bands.size() == equalizer_max_band_count) {
-            break;
-        }
-
-        sanitized_bands.push_back(equalizer_band{
-            .center_frequency_hz = (std::clamp)(
-                band.center_frequency_hz,
-                frequency_limits.min_frequency_hz,
-                frequency_limits.max_frequency_hz),
-            .gain_db = clamp_equalizer_gain_db(band.gain_db),
-            .q_value = clamp_equalizer_q_value(band.q_value),
-        });
-    }
-
-    return sanitized_bands;
 }
 
 }  // namespace
@@ -192,7 +164,7 @@ result<equalizer_response_curve> sample_equalizer_response(
     response_curve.applied_output_gain_db = state.enabled ? clamp_equalizer_gain_db(state.output_gain_db) : 0.0F;
     response_curve.points.reserve(frequencies_hz.size());
 
-    const std::vector<equalizer_band> sanitized_bands = sanitize_equalizer_bands(state.bands);
+    const std::vector<equalizer_band> sanitized_bands = detail::normalize_equalizer_bands(state.bands);
     if (state.enabled) {
         detail::dsp::output_headroom_controller headroom_controller;
         response_curve.applied_headroom_compensation_db =

@@ -93,6 +93,10 @@ public:
     [[nodiscard]] equalizer_state equalizer_state() const;
     /// Возвращает sampled-точки итоговой EQ-кривой для текущего live-состояния сессии.
     result<equalizer_response_curve> sample_equalizer_response(std::span<const float> frequencies_hz) const;
+    /// Возвращает точную preview-кривую для временного EQ-состояния без изменения live session state.
+    result<equalizer_response_curve> preview_equalizer_response(
+        const equalizer_preview_state& preview_state,
+        std::span<const float> frequencies_hz) const;
     /// Возвращает допустимый диапазон частот для конкретной полосы текущего EQ-layout.
     [[nodiscard]] std::optional<equalizer_frequency_range> equalizer_band_frequency_range(
         std::size_t band_index) const;
