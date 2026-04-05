@@ -105,10 +105,12 @@ ctest --preset ci-ninja-debug
 
 ```text
 sonotide-0.1.0-windows-msvc-x64-release.zip
+sonotide-0.1.0-windows-msvc-x64-release.zip.sha256
 ```
 
 В архив попадает install tree, который пользователь может распаковать и
-подключить через `find_package(Sonotide CONFIG REQUIRED)`.
+подключить через `find_package(Sonotide CONFIG REQUIRED)`. Рядом публикуется
+`sha256`-файл для проверки целостности скачанного архива.
 
 ## Быстрый пример
 

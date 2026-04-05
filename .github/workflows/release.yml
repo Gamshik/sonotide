@@ -86,6 +86,7 @@ jobs:
           $assetBaseName = "sonotide-$version-windows-msvc-x64-release"
           $packageRoot = Join-Path $PWD "build/release-package/$assetBaseName"
           $zipPath = Join-Path $PWD "build/$assetBaseName.zip"
+          $checksumPath = Join-Path $PWD "build/$assetBaseName.zip.sha256"
 
           if (Test-Path $packageRoot) {
             Remove-Item $packageRoot -Recurse -Force
@@ -93,13 +94,21 @@ jobs:
           if (Test-Path $zipPath) {
             Remove-Item $zipPath -Force
           }
+          if (Test-Path $checksumPath) {
+            Remove-Item $checksumPath -Force
+          }
 
           New-Item -ItemType Directory -Path $packageRoot -Force | Out-Null
           Copy-Item -Path "build/install/ci-ninja-release/*" -Destination $packageRoot -Recurse
           Compress-Archive -Path $packageRoot -DestinationPath $zipPath -Force
 
+          $hash = (Get-FileHash -Path $zipPath -Algorithm SHA256).Hash.ToLower()
+          Set-Content -Path $checksumPath -Value "$hash  $assetBaseName.zip"
+
           "asset_name=$assetBaseName.zip" >> $env:GITHUB_OUTPUT
           "asset_path=$zipPath" >> $env:GITHUB_OUTPUT
+          "checksum_name=$assetBaseName.zip.sha256" >> $env:GITHUB_OUTPUT
+          "checksum_path=$checksumPath" >> $env:GITHUB_OUTPUT
 
       - name: Publish GitHub release
         uses: softprops/action-gh-release@v2
@@ -107,4 +116,6 @@ jobs:
           name: Sonotide v${{ steps.version.outputs.version }}
           tag_name: ${{ github.ref_name }}
           generate_release_notes: true
-          files: ${{ steps.package.outputs.asset_path }}
+          files: |
+            ${{ steps.package.outputs.asset_path }}
+            ${{ steps.package.outputs.checksum_path }}
